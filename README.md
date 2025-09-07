@@ -4,3 +4,5 @@
 ├─ dashboards/    → Grafana JSON configs  
 ├─ datasets/      → (place external NB15/CICIDS/preprocessed logs)  
 └─ docs/          → PDF / Thesis report  
+mkdir CRZT-Framework && cd CRZT-Framework
+nano README.md
