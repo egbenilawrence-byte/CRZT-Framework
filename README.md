@@ -6,3 +6,9 @@
 └─ docs/          → PDF / Thesis report  
 mkdir CRZT-Framework && cd CRZT-Framework
 nano README.md
+git init
+git add .
+git commit -m "initial CRZT Framework commit"
+git branch -M main
+git remote add origin https://github.com/egbenilawrence-byte/CRZT-Framework.git
+git push -u origin main
