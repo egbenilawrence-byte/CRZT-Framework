@@ -1,0 +1,72 @@
+name: CRZT CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  crzt-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      # Step 3: Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/requirements.txt
+
+      # Step 4: Train TensorFlow model (quick test run)
+      - name: Train model
+        run: |
+          mkdir -p model
+          echo "feature1,feature2,feature3,anomaly" > datasets/sample_baseline.csv
+          echo "0.1,0.2,0.3,0" >> datasets/sample_baseline.csv
+          echo "0.9,0.8,0.7,1" >> datasets/sample_baseline.csv
+          python services/model_train.py
+
+      # Step 5: Build Docker images
+      - name: Build inference image
+        run: docker build -t crzt-inference:latest -f docker/inference/Dockerfile .
+      - name: Build controller image
+        run: docker build -t crzt-controller:latest -f docker/controller/Dockerfile .
+
+      # Step 6: Setup Kind cluster
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: crzt
+          config: k8s/kind-config.yaml
+
+      # Step 7: Load Docker images to Kind
+      - name: Load Docker images into Kind
+        run: |
+          kind load docker-image crzt-inference:latest --name crzt
+          kind load docker-image crzt-controller:latest --name crzt
+
+      # Step 8: Deploy CRZT to Kubernetes
+      - name: Deploy CRZT Components
+        run: |
+          kubectl apply -f k8s/ns.yaml
+          kubectl apply -f k8s/redis.yaml
+          kubectl apply -f k8s/rbac-controller.yaml
+          kubectl apply -f k8s/inference-deploy.yaml
+          kubectl apply -f k8s/controller-deploy.yaml
+          kubectl apply -f k8s/quarantine-np-template.yaml
+
+      # Step 9: Verify Deployment
+      - name: Verify pods are running
+        run: |
+          kubectl get pods -n crzt
+          kubectl rollout status deployment/inference -n crzt --timeout=120s
+          kubectl rollout status deployment/controller -n crzt --timeout=120s
